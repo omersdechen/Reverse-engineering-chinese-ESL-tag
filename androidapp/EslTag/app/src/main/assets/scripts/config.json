@@ -8,5 +8,6 @@
   "show_messages": true,
   "show_missed": true,
   "show_favorites": true,
-  "compact_weather": true
+  "compact_weather": true,
+  "name_max_len": 8
 }

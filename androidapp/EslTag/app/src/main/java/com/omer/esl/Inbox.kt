@@ -30,7 +30,7 @@ object Inbox {
 
     @Synchronized fun hasContent() = chats.isNotEmpty() || missed.isNotEmpty() || ringing != null
     @Synchronized fun setChat(key: String, c: Chat) {
-        chats[key] = c
+        chats.remove(key)
         chats[c.who] = c
     }
     @Synchronized fun removeChat(key: String, who: String? = null): Boolean {

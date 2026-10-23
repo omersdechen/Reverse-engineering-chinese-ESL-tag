@@ -15,7 +15,8 @@ data class Config(
     val showMessages: Boolean,
     val showMissed: Boolean,
     val showFavorites: Boolean,
-    val compactWeather: Boolean
+    val compactWeather: Boolean,
+    val nameMaxLen: Int
 ) {
 
     companion object {
@@ -58,9 +59,10 @@ data class Config(
                 showMessages = j.optBoolean("show_messages", true),
                 showMissed = j.optBoolean("show_missed", true),
                 showFavorites = j.optBoolean("show_favorites", true),
-                compactWeather = j.optBoolean("compact_weather", true)
+                compactWeather = j.optBoolean("compact_weather", true),
+                nameMaxLen = j.optInt("name_max_len", 8)
             )
-        } catch (e: Exception) { Config(emptyList(), true, 2, 5, true, true, true, true, true) }
+        } catch (e: Exception) { Config(emptyList(), true, 2, 5, true, true, true, true, true, 8) }
     }
 
     /** 1:1 chat: title is the contact. Group: title is the group, text starts with "Sender:". */

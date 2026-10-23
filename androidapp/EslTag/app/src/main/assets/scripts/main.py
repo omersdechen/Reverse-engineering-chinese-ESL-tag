@@ -27,6 +27,14 @@ def hhmm(ms):
     return time.strftime("%H:%M", time.localtime(ms / 1000.0))
 
 
+def format_name(name, max_len=8):
+    if not name:
+        return ""
+    if len(name) > max_len:
+        return name[:max_len] + ".."
+    return name
+
+
 def wrap_text(d, text, font_size, max_w, max_lines=2):
     """Splits or wraps text into up to max_lines fitting max_w."""
     if not text:
@@ -64,7 +72,7 @@ def call_screen(r):
     return E.to_payload(im)
 
 
-def inbox_screen(d, x0, y0, w, h, chats, missed, show_text):
+def inbox_screen(d, x0, y0, w, h, chats, missed, show_text, name_max_len=8):
     d.rectangle([x0, y0, x0 + w - 1, y0 + 15], fill=R)
     E.text(d, (x0 + 4, y0 + 8), "Messages", size=10, fill="white", anchor="lm")
     E.text(d, (x0 + w - 4, y0 + 8), time.strftime("%H:%M"), size=9, fill="white", anchor="rm")
@@ -75,8 +83,9 @@ def inbox_screen(d, x0, y0, w, h, chats, missed, show_text):
     rows = chats if len(chats) <= n else chats[:n - 1]
     y = top
     for c in rows:
-        # Smaller contact name (size 9.5)
-        E.text(d, (x0 + 4, y + 2), trunc(d, c["who"], 9.5, w - 36), size=9.5, fill="black", anchor="lm")
+        formatted_who = format_name(c["who"], name_max_len)
+        # Smaller contact name (size 8.5 bold)
+        E.text(d, (x0 + 4, y + 2), trunc(d, formatted_who, 8.5, w - 36), size=8.5, fill="black", anchor="lm")
         d.rectangle([x0 + w - 24, y + 1, x0 + w - 4, y + 13], fill=R)
         E.text(d, (x0 + w - 14, y + 7), str(c["count"]), size=8.5, fill="white", anchor="mm")
 
@@ -93,7 +102,7 @@ def inbox_screen(d, x0, y0, w, h, chats, missed, show_text):
         E.text(d, (x0 + 4, y + 6), "+%d more" % (len(chats) - len(rows)), size=8.5, fill="red", anchor="lm")
     if missed:
         d.rectangle([x0, y0 + h - band, x0 + w - 1, y0 + h - 1], fill=Y)
-        s = "Missed: " + ", ".join("%s %s" % (m["who"], hhmm(m["ts"])) for m in missed[:2])
+        s = "Missed: " + ", ".join("%s %s" % (format_name(m["who"], name_max_len), hhmm(m["ts"])) for m in missed[:2])
         E.text(d, (x0 + 4, y0 + h - band // 2), trunc(d, s, 8.5, w - 8), size=8.5, fill="black", anchor="lm")
 
 
@@ -105,24 +114,33 @@ def render():
     show_messages = cfg.get("show_messages", True)
     show_missed = cfg.get("show_missed", True)
     compact_weather = cfg.get("compact_weather", True)
+    name_max_len = cfg.get("name_max_len", 8)
 
     ringing = ib.get("ringing") if show_calls else None
     chats = ib.get("chats", []) if show_messages else []
     missed = [m for m in ib.get("missed", []) if m["ts"] >= limit] if show_missed else []
+
+    # Deduplicate chats by contact name
+    unique_chats = []
+    seen = set()
+    for c in chats:
+        who = c.get("who")
+        if who and who not in seen:
+            seen.add(who)
+            unique_chats.append(c)
 
     # 1. Full Screen Incoming Call
     if ringing:
         return call_screen(ringing)
 
     # 2. No messages / calls -> Full Weather Screen
-    if not chats and not missed:
+    if not unique_chats and not missed:
         return weather.render()
 
     # 3. Messages / Missed Calls
     im, d = E.new()
 
     if compact_weather:
-        # Split Screen: Left Messages (0..146), Right Compact Weather (147..249)
         try:
             w_data = weather.get(weather.URL)
         except Exception:
@@ -130,9 +148,8 @@ def render():
 
         d.line([(146, 0), (146, SH - 1)], fill=K)
         weather.draw_compact(d, 147, 0, 103, SH, w_data)
-        inbox_screen(d, 0, 0, 146, SH, chats, missed, cfg.get("show_text", True))
+        inbox_screen(d, 0, 0, 146, SH, unique_chats, missed, cfg.get("show_text", True), name_max_len)
     else:
-        # Full Screen Messages (0..250)
-        inbox_screen(d, 0, 0, SW, SH, chats, missed, cfg.get("show_text", True))
+        inbox_screen(d, 0, 0, SW, SH, unique_chats, missed, cfg.get("show_text", True), name_max_len)
 
     return E.to_payload(im)
