@@ -41,9 +41,9 @@ object Runner {
         val dir = scriptsDir(ctx)
         for (n in listOf("main.py", "weather.py", "config.json")) {
             val dst = File(dir, n)
-            val isOutdatedConfig = n == "config.json" && dst.exists() && dst.readText().contains("\"show_text\": false")
-            val forceCopy = resetMain || isOutdatedConfig
-            if (dst.exists() && !forceCopy) continue
+            val isOutdated = resetMain || n in listOf("main.py", "weather.py") ||
+                (n == "config.json" && dst.exists() && dst.readText().contains("\"show_text\": false"))
+            if (dst.exists() && !isOutdated) continue
             if (dst.exists()) dst.copyTo(File(dir, "$n.bak"), true)
             ctx.assets.open("scripts/$n").use { i -> dst.outputStream().use { i.copyTo(it) } }
         }

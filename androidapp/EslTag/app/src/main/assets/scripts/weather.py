@@ -128,9 +128,9 @@ def render():
 
     # top bar
     t = time.strptime(c["time"], "%Y-%m-%dT%H:%M")
-    d.rectangle([0, 0, SW - 1, 19], fill=R)
-    d.text((6, 10), CITY, font=E.font(14), fill=W, anchor="lm")
-    d.text((SW - 6, 10), time.strftime("%a %d %b  %H:%M", t), font=E.font(12), fill=W, anchor="rm")
+    d.rectangle([0, 0, SW - 1, 15], fill=R)
+    d.text((6, 8), CITY, font=E.font(10), fill=W, anchor="lm")
+    d.text((SW - 6, 8), time.strftime("%a %d/%m  %H:%M", t), font=E.font(9), fill=W, anchor="rm")
 
     # main block: icon | temperature | details
     tx = 6 if PHOTO else 62
@@ -171,3 +171,31 @@ def render():
         if n % 3 == 0:
             d.text((x + 7, 117), "%02d" % hh, font=E.font(9), fill=K, anchor="mm")
     return E.to_payload(im)
+
+
+def draw_compact(d, x0, y0, w, h, j=None):
+    """Draws compact weather box inside rect [x0, y0, x0+w-1, y0+h-1]."""
+    if j is None:
+        try:
+            j = get(URL)
+        except Exception:
+            j = None
+    d.rectangle([x0, y0, x0 + w - 1, y0 + 15], fill=R)
+    d.text((x0 + 4, y0 + 8), CITY, font=E.font(10), fill=W, anchor="lm")
+    if j:
+        c, dd = j["current"], j["daily"]
+        t = time.strptime(c["time"], "%Y-%m-%dT%H:%M")
+        d.text((x0 + w - 4, y0 + 8), time.strftime("%H:%M", t), font=E.font(9), fill=W, anchor="rm")
+        code, day = c["weather_code"], c.get("is_day", 1)
+        k = kind(code)
+        cx = x0 + w // 2
+        icon(d, k, day, cx - 28, y0 + 18)
+        temp = "%.0f\u00b0" % c["temperature_2m"]
+        T(d, (cx, y0 + 72), temp, 20, K, "mm")
+        hl = "H%.0f\u00b0 L%.0f\u00b0" % (dd["temperature_2m_max"][0], dd["temperature_2m_min"][0])
+        T(d, (cx, y0 + 90), hl, 9, K, "mm")
+        pmax = dd["precipitation_probability_max"][0] or 0
+        p_str = "Rain %.0f%%" % pmax if pmax > 0 else WORDS.get(code, "Clear")
+        T(d, (cx, y0 + 106), p_str, 9, R if pmax >= 30 else K, "mm", maxw=w - 6)
+    else:
+        d.text((x0 + w // 2, y0 + h // 2), "No Data", font=E.font(10), fill=K, anchor="mm")

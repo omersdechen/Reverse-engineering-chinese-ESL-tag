@@ -1,5 +1,5 @@
 """ESL helper library (bundled in the APK). Your editable scripts do `import esl_lib as E`."""
-import os, struct, sys, runpy, traceback
+import os, struct, sys, runpy, traceback, re
 from PIL import Image, ImageDraw, ImageFont
 
 SW, SH = 250, 122            # screen, landscape (what you draw on)
@@ -10,10 +10,51 @@ HW_CODE = [0, 1, 2, 3]       # logical colour (ORDER index) -> 2-bit value on th
 HDR = bytes.fromhex("5854454b00043f0400001304010000001100000000000000000000007a000000fa010000" "12")
 DIR = ""                     # scripts folder, set by run_scripts()
 
-FONTS = ["/system/fonts/Roboto-Bold.ttf", "/system/fonts/Roboto-Regular.ttf",
+FONTS = ["/system/fonts/NotoSansHebrew-Bold.ttf", "/system/fonts/NotoSansHebrew-Regular.ttf",
+         "/system/fonts/DroidSansHebrew.ttf", "/system/fonts/SecularOne-Regular.ttf",
+         "/system/fonts/Roboto-Bold.ttf", "/system/fonts/Roboto-Regular.ttf",
          "/system/fonts/DroidSans-Bold.ttf", "/system/fonts/DroidSans.ttf",
          "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
 _fcache = {}
+_emoji_font_cache = {}
+
+
+def emoji_font(size):
+    if size in _emoji_font_cache:
+        return _emoji_font_cache[size]
+    candidates = [
+        "/system/fonts/NotoColorEmoji.ttf",
+        "/system/fonts/NotoColorEmojiFlags.ttf",
+        "/system/fonts/AndroidEmoji.ttf",
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                _emoji_font_cache[size] = ImageFont.truetype(p, size)
+                return _emoji_font_cache[size]
+            except Exception:
+                continue
+    _emoji_font_cache[size] = None
+    return None
+
+
+def is_emoji(c):
+    cp = ord(c)
+    return (
+        0x1F600 <= cp <= 0x1F64F or
+        0x1F300 <= cp <= 0x1F5FF or
+        0x1F680 <= cp <= 0x1F6FF or
+        0x1F1E6 <= cp <= 0x1F1FF or
+        0x2600 <= cp <= 0x27BF or
+        0x2300 <= cp <= 0x23FF or
+        0x2B50 <= cp <= 0x2B55 or
+        0x1F900 <= cp <= 0x1F9FF or
+        0x1FA70 <= cp <= 0x1FAFF
+    )
+
+
+def remove_unsupported_symbols(s):
+    return "".join(c for c in s if ord(c) >= 32 or c in "\n\r\t")
 
 
 def font(size):
@@ -34,9 +75,22 @@ def font(size):
     raise RuntimeError("no font found; copy a .ttf to the scripts folder as font.ttf")
 
 
+def is_hebrew(s):
+    return any("\u0590" <= c <= "\u05ff" for c in s)
+
+
 def shape(s):
-    """Pure-Hebrew lines are reversed for left-to-right drawing."""
-    return s[::-1] if any("\u0590" <= c <= "\u05ff" for c in s) else s
+    """Bi-directional Hebrew shaper for RTL text rendering in Pillow."""
+    if not is_hebrew(s):
+        return s
+    tokens = re.findall(r'[\u0590-\u05ff]+|[a-zA-Z0-9]+|[^\w\s]|\s+', s)
+    shaped_tokens = []
+    for t in tokens:
+        if is_hebrew(t):
+            shaped_tokens.append(t[::-1])
+        else:
+            shaped_tokens.append(t)
+    return "".join(reversed(shaped_tokens))
 
 
 def new(bg="white"):
@@ -46,8 +100,31 @@ def new(bg="white"):
     return im, d
 
 
+def draw_text_smart(d, xy, s, size, fill="black", anchor="la"):
+    """Smart text renderer with bi-directional Hebrew and Emoji support."""
+    s = remove_unsupported_symbols(s)
+    shaped_s = shape(s)
+    f = font(size)
+    ef = emoji_font(size)
+
+    if not ef or not any(is_emoji(c) for c in shaped_s):
+        d.text(xy, shaped_s, font=f, fill=RGB[fill], anchor=anchor)
+        return
+
+    x, y = xy
+    tokens = re.findall(r'[\U00010000-\U0010ffff\u2600-\u27bf\u2300-\u23ff]+|[^\U00010000-\U0010ffff\u2600-\u27bf\u2300-\u23ff]+', shaped_s)
+    curr_x = x
+    for tok in tokens:
+        if any(is_emoji(c) for c in tok) and ef:
+            d.text((curr_x, y), tok, font=ef, anchor=anchor)
+            curr_x += d.textlength(tok, font=ef)
+        else:
+            d.text((curr_x, y), tok, font=f, fill=RGB[fill], anchor=anchor)
+            curr_x += d.textlength(tok, font=f)
+
+
 def text(d, xy, s, size, fill="black", anchor="la"):
-    d.text(xy, shape(s), font=font(size), fill=RGB[fill], anchor=anchor)
+    draw_text_smart(d, xy, s, size, fill, anchor)
 
 
 def bar(d, s, size=16, bg="red", fg="white", h=26):

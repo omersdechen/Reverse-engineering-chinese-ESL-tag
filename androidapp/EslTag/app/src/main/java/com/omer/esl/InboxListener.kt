@@ -41,9 +41,13 @@ class InboxListener : NotificationListenerService() {
         val title = s.notification.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
             ?: s.notification.extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
 
-        when {
-            Inbox.clearRingingKey(s.key) -> Pipeline.schedule(this, Kind.CALL)   // call ended or answered
-            Inbox.removeChat(s.key, title) -> Pipeline.schedule(this, Kind.CHAT) // chat read or dismissed
+        var changed = false
+        if (Inbox.clearRingingKey(s.key)) changed = true
+        if (Inbox.removeChat(s.key, title)) changed = true
+        if (Inbox.removeMissed(title)) changed = true
+
+        if (changed) {
+            Pipeline.schedule(this, Kind.CHAT)
         }
     }
 

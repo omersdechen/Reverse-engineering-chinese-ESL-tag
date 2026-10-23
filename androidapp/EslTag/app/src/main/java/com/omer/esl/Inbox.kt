@@ -36,12 +36,30 @@ object Inbox {
     @Synchronized fun removeChat(key: String, who: String? = null): Boolean {
         var removed = chats.remove(key) != null
         if (who != null && chats.remove(who) != null) removed = true
+        val matches = chats.entries.filter { (k, v) ->
+            k == key || v.who == who || (who != null && (v.who.contains(who, ignoreCase = true) || who.contains(v.who, ignoreCase = true)))
+        }.map { it.key }
+        for (k in matches) {
+            chats.remove(k)
+            removed = true
+        }
         return removed
     }
 
     @Synchronized fun addMissed(m: Missed) {
         if (missed.any { it.who == m.who && Math.abs(it.ts - m.ts) < 60_000 }) return
         missed.add(0, m); while (missed.size > 8) missed.removeAt(missed.size - 1)
+    }
+
+    @Synchronized fun removeMissed(who: String? = null): Boolean {
+        if (who.isNullOrBlank()) {
+            val had = missed.isNotEmpty()
+            missed.clear()
+            return had
+        }
+        return missed.removeAll { m ->
+            m.who.contains(who, ignoreCase = true) || who.contains(m.who, ignoreCase = true)
+        }
     }
 
     @Synchronized fun clear() { chats.clear(); missed.clear(); ringing = null; answered = false }
