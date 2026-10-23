@@ -6,7 +6,17 @@ import org.json.JSONObject
 import java.io.File
 
 /** Read from scripts/config.json on every use, so edits apply without a rebuild. */
-data class Config(val people: List<String>, val showText: Boolean, val chatDelayS: Int, val chatMinGapS: Int) {
+data class Config(
+    val people: List<String>,
+    val showText: Boolean,
+    val chatDelayS: Int,
+    val chatMinGapS: Int,
+    val showCalls: Boolean,
+    val showMessages: Boolean,
+    val showMissed: Boolean,
+    val showFavorites: Boolean,
+    val compactWeather: Boolean
+) {
 
     companion object {
         fun clean(s: String): String {
@@ -43,8 +53,14 @@ data class Config(val people: List<String>, val showText: Boolean, val chatDelay
                 people = if (a == null) emptyList() else (0 until a.length()).map { clean(a.getString(it)) },
                 showText = j.optBoolean("show_text", true),
                 chatDelayS = j.optInt("chat_delay_s", 2),
-                chatMinGapS = j.optInt("chat_min_gap_s", 5))
-        } catch (e: Exception) { Config(emptyList(), true, 2, 5) }
+                chatMinGapS = j.optInt("chat_min_gap_s", 5),
+                showCalls = j.optBoolean("show_calls", true),
+                showMessages = j.optBoolean("show_messages", true),
+                showMissed = j.optBoolean("show_missed", true),
+                showFavorites = j.optBoolean("show_favorites", true),
+                compactWeather = j.optBoolean("compact_weather", true)
+            )
+        } catch (e: Exception) { Config(emptyList(), true, 2, 5, true, true, true, true, true) }
     }
 
     /** 1:1 chat: title is the contact. Group: title is the group, text starts with "Sender:". */
@@ -61,10 +77,14 @@ data class Config(val people: List<String>, val showText: Boolean, val chatDelay
         }
         if (matchesConfig) return true
 
-        // 2. Check Favorite / Starred contacts from phone
-        val starred = getStarredContacts(ctx)
-        return starred.any { st ->
-            st.isNotBlank() && (cTitle.contains(st) || cText.contains(st))
+        // 2. Check Favorite / Starred contacts from phone if enabled
+        if (showFavorites) {
+            val starred = getStarredContacts(ctx)
+            return starred.any { st ->
+                st.isNotBlank() && (cTitle.contains(st) || cText.contains(st))
+            }
         }
+
+        return false
     }
 }

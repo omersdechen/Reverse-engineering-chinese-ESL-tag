@@ -3,5 +3,10 @@
   "show_text": true,
   "chat_delay_s": 2,
   "chat_min_gap_s": 5,
-  "missed_hours": 12
+  "missed_hours": 12,
+  "show_calls": true,
+  "show_messages": true,
+  "show_missed": true,
+  "show_favorites": true,
+  "compact_weather": true
 }

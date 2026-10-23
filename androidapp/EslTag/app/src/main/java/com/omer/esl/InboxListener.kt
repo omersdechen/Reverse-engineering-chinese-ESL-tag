@@ -63,14 +63,23 @@ class InboxListener : NotificationListenerService() {
         val text = n.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
             ?: n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
             ?: ""
+        val cfg = Config.load(this)
         val low = text.lowercase()
         val now = System.currentTimeMillis()
         when {
-            missedWords.any { low.contains(it) } -> { Inbox.addMissed(Missed(title, "whatsapp", now)); return Kind.CALL }
-            incoming.any { low.contains(it) } -> { Inbox.ring(Ringing(title, "whatsapp", s.key, now)); return Kind.CALL }
+            missedWords.any { low.contains(it) } -> {
+                if (!cfg.showMissed) return null
+                Inbox.addMissed(Missed(title, "whatsapp", now))
+                return Kind.CALL
+            }
+            incoming.any { low.contains(it) } -> {
+                if (!cfg.showCalls) return null
+                Inbox.ring(Ringing(title, "whatsapp", s.key, now))
+                return Kind.CALL
+            }
             n.category == Notification.CATEGORY_CALL -> return null     // ongoing call
         }
-        val cfg = Config.load(this)
+        if (!cfg.showMessages) return null
         if (!cfg.matches(this, title, text)) return null
         val count = (n.extras.getParcelableArray(Notification.EXTRA_MESSAGES)?.size ?: 1).coerceAtLeast(1)
         Inbox.setChat(s.key, Chat(title, count, if (cfg.showText) text else "", s.postTime))
