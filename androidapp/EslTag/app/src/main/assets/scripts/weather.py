@@ -49,6 +49,51 @@ def disc(d, cx, cy, r, fill, outline=None):
     d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=fill, outline=outline)
 
 
+def sun_small(d, cx, cy, r):
+    for a in range(0, 360, 45):
+        c, s = math.cos(math.radians(a)), math.sin(math.radians(a))
+        d.line([cx + c * (r + 2), cy + s * (r + 2), cx + c * (r + 5), cy + s * (r + 5)], fill=Y, width=1)
+    disc(d, cx, cy, r, Y, K)
+
+
+def moon_small(d, cx, cy, r):
+    disc(d, cx, cy, r, Y, K)
+    disc(d, cx + r * 0.55, cy - r * 0.35, r * 0.85, W)
+
+
+def cloud_small(d, x, y, w):
+    parts = [(0.27, 0.50, 0.20), (0.50, 0.36, 0.27), (0.76, 0.52, 0.19)]
+    for grow, col in ((1, K), (0, W)):
+        for cx, cy, r in parts:
+            disc(d, x + cx * w, y + cy * w, r * w + grow, col)
+        d.rectangle([x + 0.27 * w, y + 0.50 * w, x + 0.76 * w, y + 0.71 * w + grow], fill=col)
+
+
+def icon_compact(d, k, day, x, y):
+    """Compact 30x30 px box at (x, y)."""
+    if k == "clear":
+        (sun_small if day else moon_small)(d, x + 15, y + 15, 8)
+    elif k == "partly":
+        (sun_small if day else moon_small)(d, x + 20, y + 9, 6)
+        cloud_small(d, x, y + 8, 28)
+    elif k == "cloud":
+        cloud_small(d, x + 1, y + 5, 28)
+    else:
+        cloud_small(d, x + 2, y + 2, 26)
+        if k == "rain":
+            for i in range(3):
+                d.line([x + 9 + i * 6, y + 21, x + 7 + i * 6, y + 27], fill=K, width=1)
+        elif k == "snow":
+            for i in range(3):
+                disc(d, x + 9 + i * 6, y + 23 + (i % 2) * 2, 1, K)
+        elif k == "storm":
+            d.polygon([(x + 16, y + 18), (x + 11, y + 24), (x + 15, y + 24), (x + 13, y + 29),
+                       (x + 20, y + 21), (x + 16, y + 21), (x + 18, y + 18)], fill=Y, outline=K)
+        elif k == "fog":
+            for i in range(3):
+                d.line([x + 3, y + 20 + i * 3, x + 27, y + 20 + i * 3], fill=K, width=1)
+
+
 def sun(d, cx, cy, r):
     for a in range(0, 360, 45):
         c, s = math.cos(math.radians(a)), math.sin(math.radians(a))
@@ -174,28 +219,76 @@ def render():
 
 
 def draw_compact(d, x0, y0, w, h, j=None):
-    """Draws compact weather box inside rect [x0, y0, x0+w-1, y0+h-1]."""
+    """Draws rich compact weather box containing all weather features inside rect [x0, y0, x0+w-1, y0+h-1]."""
     if j is None:
         try:
             j = get(URL)
         except Exception:
             j = None
+
+    # 1. Top Header Bar (0..15)
     d.rectangle([x0, y0, x0 + w - 1, y0 + 15], fill=R)
-    d.text((x0 + 4, y0 + 8), CITY, font=E.font(10), fill=W, anchor="lm")
-    if j:
-        c, dd = j["current"], j["daily"]
-        t = time.strptime(c["time"], "%Y-%m-%dT%H:%M")
-        d.text((x0 + w - 4, y0 + 8), time.strftime("%H:%M", t), font=E.font(9), fill=W, anchor="rm")
-        code, day = c["weather_code"], c.get("is_day", 1)
-        k = kind(code)
-        cx = x0 + w // 2
-        icon(d, k, day, cx - 28, y0 + 18)
-        temp = "%.0f\u00b0" % c["temperature_2m"]
-        T(d, (cx, y0 + 72), temp, 20, K, "mm")
-        hl = "H%.0f\u00b0 L%.0f\u00b0" % (dd["temperature_2m_max"][0], dd["temperature_2m_min"][0])
-        T(d, (cx, y0 + 90), hl, 9, K, "mm")
-        pmax = dd["precipitation_probability_max"][0] or 0
-        p_str = "Rain %.0f%%" % pmax if pmax > 0 else WORDS.get(code, "Clear")
-        T(d, (cx, y0 + 106), p_str, 9, R if pmax >= 30 else K, "mm", maxw=w - 6)
+    d.text((x0 + 4, y0 + 8), CITY, font=E.font(9), fill=W, anchor="lm")
+
+    if not j:
+        d.text((x0 + w // 2, y0 + h // 2), "No Weather", font=E.font(10), fill=K, anchor="mm")
+        return
+
+    c, h_data, dd = j["current"], j["hourly"], j["daily"]
+    t = time.strptime(c["time"], "%Y-%m-%dT%H:%M")
+    d.text((x0 + w - 4, y0 + 8), time.strftime("%H:%M", t), font=E.font(9), fill=W, anchor="rm")
+
+    code, day = c["weather_code"], c.get("is_day", 1)
+    k = kind(code)
+
+    # 2. Main Weather Icon + Temp + Condition + High/Low (y = 16..56)
+    icon_compact(d, k, day, x0 + 4, y0 + 18)
+    temp_str = "%.0f\u00b0" % c["temperature_2m"]
+    T(d, (x0 + 42, y0 + 25), temp_str, 18, K, "lm")
+    cond_word = WORDS.get(code, "Clear").split()[0]
+    T(d, (x0 + 42, y0 + 38), cond_word, 8, R, "lm", maxw=w - 44)
+    hl_str = "H%.0f\u00b0 L%.0f\u00b0" % (dd["temperature_2m_max"][0], dd["temperature_2m_min"][0])
+    T(d, (x0 + 42, y0 + 49), hl_str, 8, K, "lm", maxw=w - 44)
+
+    # 3. Compact Weather Details Grid (y = 57..79)
+    d.line([(x0 + 4, y0 + 56), (x0 + w - 5, y0 + 56)], fill=K)
+    feels_str = "Feels %.0f\u00b0" % c["apparent_temperature"]
+    uv_val = dd["uv_index_max"][0] or 0
+    T(d, (x0 + 4, y0 + 63), feels_str, 8, K, "lm")
+    T(d, (x0 + w - 4, y0 + 63), "UV %.0f" % uv_val, 8, K, "rm")
+
+    deg = c.get("wind_direction_10m") or 0
+    compass = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][int((deg + 22.5) // 45) % 8]
+    wind_str = "W %.0fkm/h %s" % (c["wind_speed_10m"], compass)
+    hum_str = "H %.0f%%" % c["relative_humidity_2m"]
+    T(d, (x0 + 4, y0 + 73), wind_str, 8, K, "lm", maxw=w - 38)
+    T(d, (x0 + w - 4, y0 + 73), hum_str, 8, K, "rm")
+
+    # 4. Sun / Rain Summary Line (y = 80..91)
+    d.line([(x0 + 4, y0 + 80), (x0 + w - 5, y0 + 80)], fill=K)
+    pmax = dd["precipitation_probability_max"][0] or 0
+    psum = dd["precipitation_sum"][0] or 0
+    if psum > 0 or pmax >= 20:
+        rain_str = "Rain %.0f%% %.1fmm" % (pmax, psum)
+        T(d, (x0 + 4, y0 + 87), rain_str, 8, R, "lm", maxw=w - 8)
     else:
-        d.text((x0 + w // 2, y0 + h // 2), "No Data", font=E.font(10), fill=K, anchor="mm")
+        sun_str = "Sun %s-%s" % (dd["sunrise"][0][11:16], dd["sunset"][0][11:16])
+        T(d, (x0 + 4, y0 + 87), sun_str, 8, K, "lm", maxw=w - 8)
+
+    # 5. Mini 6-Hour Hourly Rain Bar Chart (y = 93..121)
+    d.line([(x0 + 4, y0 + 93), (x0 + w - 5, y0 + 93)], fill=K)
+    now = c["time"][:13]
+    i0 = next((i for i, x in enumerate(h_data["time"]) if x[:13] == now), 0)
+    hrs = [(int(h_data["time"][i][11:13]), h_data["precipitation_probability"][i] or 0, h_data["precipitation"][i] or 0)
+           for i in range(i0, min(i0 + 6, len(h_data["time"])))]
+
+    base_y = y0 + 111
+    bar_hmax = 12
+    step = (w - 8) / max(1, len(hrs))
+    for n, (hh, p, mm) in enumerate(hrs):
+        bx = int(x0 + 4 + n * step)
+        bw = max(2, int(step - 2))
+        bh = max(1, round(p / 100.0 * bar_hmax))
+        d.rectangle([bx, base_y - bh, bx + bw, base_y], fill=R if mm >= 0.1 else K)
+        if n % 2 == 0:
+            d.text((bx + bw // 2, y0 + 116), "%02d" % hh, font=E.font(7), fill=K, anchor="mm")

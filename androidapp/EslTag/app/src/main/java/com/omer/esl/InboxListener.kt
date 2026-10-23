@@ -71,7 +71,7 @@ class InboxListener : NotificationListenerService() {
             n.category == Notification.CATEGORY_CALL -> return null     // ongoing call
         }
         val cfg = Config.load(this)
-        if (!cfg.matches(title, text)) return null
+        if (!cfg.matches(this, title, text)) return null
         val count = (n.extras.getParcelableArray(Notification.EXTRA_MESSAGES)?.size ?: 1).coerceAtLeast(1)
         Inbox.setChat(s.key, Chat(title, count, if (cfg.showText) text else "", s.postTime))
         return Kind.CHAT
