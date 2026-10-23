@@ -22,10 +22,28 @@ class InboxListener : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(s: StatusBarNotification) {
+        handleRemoved(s, REASON_CANCEL)
+    }
+
+    override fun onNotificationRemoved(s: StatusBarNotification, rankingMap: RankingMap, reason: Int) {
+        handleRemoved(s, reason)
+    }
+
+    private fun handleRemoved(s: StatusBarNotification, reason: Int) {
         if (!s.packageName.startsWith("com.whatsapp")) return
+        
+        // If WhatsApp internally cancelled/replaced the notification (REASON_APP_CANCEL = 8),
+        // keep the chat in the inbox so it isn't deleted before upload!
+        if (reason == REASON_APP_CANCEL || reason == 12 /* REASON_GROUP_SUMMARY_CANCELED */) {
+            return
+        }
+
+        val title = s.notification.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+            ?: s.notification.extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
+
         when {
             Inbox.clearRingingKey(s.key) -> Pipeline.schedule(this, Kind.CALL)   // call ended or answered
-            Inbox.removeChat(s.key) -> Pipeline.schedule(this, Kind.CHAT)        // chat read or dismissed
+            Inbox.removeChat(s.key, title) -> Pipeline.schedule(this, Kind.CHAT) // chat read or dismissed
         }
     }
 
@@ -34,8 +52,13 @@ class InboxListener : NotificationListenerService() {
         if (!s.packageName.startsWith("com.whatsapp")) return null
         val n = s.notification
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return null
-        val title = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: return null
-        val text = n.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+        val title = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+            ?: n.extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
+            ?: s.notification.tickerText?.toString()
+            ?: return null
+        val text = n.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+            ?: n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+            ?: ""
         val low = text.lowercase()
         val now = System.currentTimeMillis()
         when {

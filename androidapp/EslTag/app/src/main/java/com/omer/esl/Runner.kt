@@ -1,6 +1,11 @@
 package com.omer.esl
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.os.Build
+import androidx.core.app.NotificationCompat
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import kotlinx.coroutines.Dispatchers
@@ -31,12 +36,14 @@ object Runner {
 
     fun scriptsDir(ctx: Context): File = File(ctx.getExternalFilesDir(null), "scripts").apply { mkdirs() }
 
-    /** Copies bundled scripts into the editable folder if missing. resetMain also restores main.py (old one kept as .bak). */
+    /** Copies bundled scripts into the editable folder if missing or outdated. */
     fun ensureScripts(ctx: Context, resetMain: Boolean = false) {
         val dir = scriptsDir(ctx)
         for (n in listOf("main.py", "weather.py", "config.json")) {
             val dst = File(dir, n)
-            if (dst.exists() && !(resetMain && n == "main.py")) continue
+            val isOutdatedConfig = n == "config.json" && dst.exists() && dst.readText().contains("\"show_text\": false")
+            val forceCopy = resetMain || isOutdatedConfig
+            if (dst.exists() && !forceCopy) continue
             if (dst.exists()) dst.copyTo(File(dir, "$n.bak"), true)
             ctx.assets.open("scripts/$n").use { i -> dst.outputStream().use { i.copyTo(it) } }
         }
@@ -49,6 +56,36 @@ object Runner {
             .callAttr("run_scripts", scriptsDir(ctx).path).toJava(ByteArray::class.java)
     }
 
+    fun showPreviewNotification(ctx: Context) {
+        try {
+            val previewFile = File(scriptsDir(ctx), "preview.png")
+            if (!previewFile.exists()) return
+            val bitmap = BitmapFactory.decodeFile(previewFile.path) ?: return
+
+            val channelId = "esl_preview"
+            val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    "ESL Tag Previews",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                )
+                nm.createNotificationChannel(channel)
+            }
+
+            val builder = NotificationCompat.Builder(ctx, channelId)
+                .setSmallIcon(android.R.drawable.ic_menu_gallery)
+                .setContentTitle("ESL Tag Preview")
+                .setContentText("New tag layout rendered")
+                .setStyle(NotificationCompat.BigPictureStyle().bigPicture(bitmap))
+                .setAutoCancel(true)
+
+            nm.notify(1001, builder.build())
+        } catch (e: Exception) {
+            EslLog.add(ctx, "preview notification error: ${e.message}")
+        }
+    }
+
     /** Render main.py and (optionally) upload to the tag. Returns true on success. */
     suspend fun run(ctx: Context, upload: Boolean = true, markDaily: Boolean = true): Boolean {
         if (!busy.compareAndSet(false, true)) { EslLog.add(ctx, "already running"); return false }
@@ -56,6 +93,7 @@ object Runner {
             EslLog.add(ctx, "rendering")
             val payload = withContext(Dispatchers.IO) { render(ctx) }
             EslLog.add(ctx, "payload ${payload.size} B")
+            showPreviewNotification(ctx)
             if (!upload) return true
             EslBle(ctx, MAC).upload(payload) { EslLog.add(ctx, it) }
             if (markDaily) prefs(ctx).edit().putString("last_ok_day", today()).apply()

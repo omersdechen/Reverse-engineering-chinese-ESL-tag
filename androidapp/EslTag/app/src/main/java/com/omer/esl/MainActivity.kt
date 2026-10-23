@@ -30,8 +30,16 @@ class MainActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         Runner.ensureScripts(this)
-        requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.READ_CALL_LOG, Manifest.permission.READ_CONTACTS), 1)
+        val perms = mutableListOf(
+            Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.READ_CONTACTS
+        )
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            perms.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        requestPermissions(perms.toTypedArray(), 1)
 
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 48, 24, 24) }
         info = TextView(this).also { root.addView(it) }

@@ -76,4 +76,4 @@ def render():
     chats = ib.get("chats", [])
     if not chats and not missed:
         return weather.render()
-    return inbox_screen(chats, missed, cfg.get("show_text", False))
+    return inbox_screen(chats, missed, cfg.get("show_text", True))

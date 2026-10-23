@@ -29,8 +29,15 @@ object Inbox {
     }
 
     @Synchronized fun hasContent() = chats.isNotEmpty() || missed.isNotEmpty() || ringing != null
-    @Synchronized fun setChat(key: String, c: Chat) { chats[key] = c }
-    @Synchronized fun removeChat(key: String) = chats.remove(key) != null
+    @Synchronized fun setChat(key: String, c: Chat) {
+        chats[key] = c
+        chats[c.who] = c
+    }
+    @Synchronized fun removeChat(key: String, who: String? = null): Boolean {
+        var removed = chats.remove(key) != null
+        if (who != null && chats.remove(who) != null) removed = true
+        return removed
+    }
 
     @Synchronized fun addMissed(m: Missed) {
         if (missed.any { it.who == m.who && Math.abs(it.ts - m.ts) < 60_000 }) return

@@ -1,7 +1,7 @@
 {
   "people": ["gali", "mom"],
-  "show_text": false,
-  "chat_delay_s": 20,
-  "chat_min_gap_s": 120,
+  "show_text": true,
+  "chat_delay_s": 2,
+  "chat_min_gap_s": 5,
   "missed_hours": 12
 }
