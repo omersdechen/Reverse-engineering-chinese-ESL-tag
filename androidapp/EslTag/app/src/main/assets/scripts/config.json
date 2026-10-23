@@ -1,0 +1,7 @@
+{
+  "people": ["gali", "mom"],
+  "show_text": false,
+  "chat_delay_s": 20,
+  "chat_min_gap_s": 120,
+  "missed_hours": 12
+}

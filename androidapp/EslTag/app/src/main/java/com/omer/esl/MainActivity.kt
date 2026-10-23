@@ -7,9 +7,12 @@ import android.bluetooth.le.ScanFilter
 import android.companion.*
 import android.content.Intent
 import android.content.IntentSender
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.*
+import androidx.core.app.NotificationManagerCompat
 import androidx.work.*
 import kotlinx.coroutines.*
 import java.io.File
@@ -27,16 +30,22 @@ class MainActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         Runner.ensureScripts(this)
-        requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1)
+        requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_CALL_LOG, Manifest.permission.READ_CONTACTS), 1)
 
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 48, 24, 24) }
         info = TextView(this).also { root.addView(it) }
         preview = ImageView(this).apply { adjustViewBounds = true }.also { root.addView(it) }
         fun btn(t: String, f: () -> Unit) = root.addView(Button(this).apply { text = t; setOnClickListener { f() } })
+        fun edit(n: String) = startActivity(Intent(this, EditorActivity::class.java).putExtra("file", n))
         btn("Run now: render + upload") { go(true) }
         btn("Render only (preview)") { go(false) }
-        btn("Edit main.py") { startActivity(Intent(this, EditorActivity::class.java)) }
+        btn("Edit main.py") { edit("main.py") }
+        btn("Edit weather.py") { edit("weather.py") }
+        btn("Edit config.json (people, timing)") { edit("config.json") }
         btn("Pair tag (enables automatic daily upload)") { pair() }
+        btn("Notification access (WhatsApp)") { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+        btn("Clear inbox + refresh tag") { Inbox.clear(); Pipeline.schedule(applicationContext, Kind.CALL); refresh() }
         btn("Reset main.py to default (keeps .bak)") { Runner.ensureScripts(this, true); refresh() }
         btn("Refresh") { refresh() }
         logView = TextView(this).apply { textSize = 11f; setTextIsSelectable(true) }.also { root.addView(it) }
@@ -50,6 +59,7 @@ class MainActivity : Activity() {
     override fun onResume() { super.onResume(); observePresence(); refresh() }
 
     private fun associated() = cdm.associations.any { it.equals(Runner.MAC, true) }
+    private fun granted(p: String) = checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED
 
     private fun observePresence() {
         try { if (associated()) cdm.startObservingDevicePresence(Runner.MAC) }
@@ -61,8 +71,10 @@ class MainActivity : Activity() {
     }
 
     private fun refresh() {
-        info.text = "Tag ${Runner.MAC}\npaired: ${associated()}   last upload: ${Runner.lastOk(this)}\n" +
-            "scripts: ${Runner.scriptsDir(this)}"
+        val listener = NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
+        info.text = "Tag ${Runner.MAC}\npaired: ${associated()}   last daily upload: ${Runner.lastOk(this)}\n" +
+            "WhatsApp access: $listener   call log: ${granted(Manifest.permission.READ_CALL_LOG)}   " +
+            "contacts: ${granted(Manifest.permission.READ_CONTACTS)}\nscripts: ${Runner.scriptsDir(this)}"
         File(Runner.scriptsDir(this), "preview.png").takeIf { it.exists() }
             ?.let { preview.setImageBitmap(BitmapFactory.decodeFile(it.path)) }
         logView.text = EslLog.read(this)

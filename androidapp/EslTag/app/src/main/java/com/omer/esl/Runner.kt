@@ -31,11 +31,15 @@ object Runner {
 
     fun scriptsDir(ctx: Context): File = File(ctx.getExternalFilesDir(null), "scripts").apply { mkdirs() }
 
-    fun ensureScripts(ctx: Context, overwrite: Boolean = false) {
-        val dst = File(scriptsDir(ctx), "main.py")
-        if (dst.exists() && !overwrite) return
-        if (dst.exists()) dst.copyTo(File(dst.parentFile, "main.py.bak"), true)
-        ctx.assets.open("scripts/main.py").use { i -> dst.outputStream().use { i.copyTo(it) } }
+    /** Copies bundled scripts into the editable folder if missing. resetMain also restores main.py (old one kept as .bak). */
+    fun ensureScripts(ctx: Context, resetMain: Boolean = false) {
+        val dir = scriptsDir(ctx)
+        for (n in listOf("main.py", "weather.py", "config.json")) {
+            val dst = File(dir, n)
+            if (dst.exists() && !(resetMain && n == "main.py")) continue
+            if (dst.exists()) dst.copyTo(File(dir, "$n.bak"), true)
+            ctx.assets.open("scripts/$n").use { i -> dst.outputStream().use { i.copyTo(it) } }
+        }
     }
 
     private fun render(ctx: Context): ByteArray {
@@ -46,7 +50,7 @@ object Runner {
     }
 
     /** Render main.py and (optionally) upload to the tag. Returns true on success. */
-    suspend fun run(ctx: Context, upload: Boolean = true): Boolean {
+    suspend fun run(ctx: Context, upload: Boolean = true, markDaily: Boolean = true): Boolean {
         if (!busy.compareAndSet(false, true)) { EslLog.add(ctx, "already running"); return false }
         try {
             EslLog.add(ctx, "rendering")
@@ -54,7 +58,7 @@ object Runner {
             EslLog.add(ctx, "payload ${payload.size} B")
             if (!upload) return true
             EslBle(ctx, MAC).upload(payload) { EslLog.add(ctx, it) }
-            prefs(ctx).edit().putString("last_ok_day", today()).apply()
+            if (markDaily) prefs(ctx).edit().putString("last_ok_day", today()).apply()
             EslLog.add(ctx, "upload OK")
             return true
         } catch (e: Exception) {

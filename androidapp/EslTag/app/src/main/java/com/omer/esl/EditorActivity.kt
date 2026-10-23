@@ -13,7 +13,7 @@ import java.io.File
 class EditorActivity : Activity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
-        val f = File(Runner.scriptsDir(this), "main.py")
+        val f = File(Runner.scriptsDir(this), intent.getStringExtra("file") ?: "main.py")
         val et = EditText(this).apply {
             setText(f.readText()); typeface = Typeface.MONOSPACE; textSize = 12f; gravity = Gravity.TOP
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
