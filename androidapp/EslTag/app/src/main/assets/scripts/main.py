@@ -17,8 +17,8 @@ def load(name, default):
 
 
 def trunc(d, s, size, maxw):
-    cut = False
-    while s and E.get_text_width(s, size) > maxw:
+    f, cut = E.font(size), False
+    while s and d.textlength(E.shape(s), font=f) > maxw:
         s, cut = s[:-1], True
     return s + (".." if cut else "")
 
