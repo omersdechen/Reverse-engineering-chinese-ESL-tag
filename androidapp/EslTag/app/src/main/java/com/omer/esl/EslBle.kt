@@ -98,8 +98,14 @@ class EslBle(private val ctx: Context, private val mac: String) {
 
     suspend fun upload(payload: ByteArray, log: (String) -> Unit) {
         var last: Exception? = null
+        val t0 = System.currentTimeMillis()
         repeat(3) { n ->
-            try { attempt(payload, log); return }
+            try {
+                attempt(payload, log)
+                val bleMs = System.currentTimeMillis() - t0
+                EslStats.addBleTime(ctx, bleMs)
+                return
+            }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { last = e; log("attempt ${n + 1} failed: ${e.message}"); delay(2000) }
         }

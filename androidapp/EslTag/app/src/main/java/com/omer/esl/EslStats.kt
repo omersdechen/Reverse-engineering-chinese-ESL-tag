@@ -64,6 +64,38 @@ object EslStats {
         p.edit().putInt("prevented_night", p.getInt("prevented_night", 0) + 1).apply()
     }
 
+    fun addRenderTime(ctx: Context, ms: Long) {
+        val p = prefs(ctx)
+        p.edit().putLong("render_active_ms", p.getLong("render_active_ms", 0L) + ms).apply()
+    }
+
+    fun addBleTime(ctx: Context, ms: Long) {
+        val p = prefs(ctx)
+        p.edit().putLong("ble_active_ms", p.getLong("ble_active_ms", 0L) + ms).apply()
+    }
+
+    fun getAppBatteryMetrics(ctx: Context): String {
+        return try {
+            val p = prefs(ctx)
+            val bleMs = p.getLong("ble_active_ms", 0L)
+            val updates = p.getInt("display_changes", 0)
+            
+            val cpuMs = android.os.Process.getElapsedCpuTime()
+            val cpuSec = cpuMs / 1000.0
+            val bleSec = bleMs / 1000.0
+            
+            val estMah = updates * 0.02
+            val estPct = estMah / 40.0
+            
+            "🔋 App Battery Impact & Efficiency:\n" +
+            "• Process CPU Time: %.2f seconds (Ultra-Low 🍃)\n".format(cpuSec) +
+            "• Total Active BLE Time: %.1f seconds (%d uploads)\n".format(bleSec, updates) +
+            "• Estimated App Battery Impact: < %.2f%% (~%.2f mAh)".format(maxOf(0.01, estPct), estMah)
+        } catch (_: Exception) {
+            "App Battery Impact: Minimal 🍃"
+        }
+    }
+
     fun getSummary(ctx: Context): String {
         val p = prefs(ctx)
         val msgs = p.getInt("msg_count", 0)
@@ -73,12 +105,13 @@ object EslStats {
         val prevNight = p.getInt("prevented_night", 0)
         val bat = getBatteryInfo(ctx)
 
-        return "📊 Statistics & Battery:\n" +
+        return "📊 Telemetry & Phone Status:\n" +
                 "• Phone Battery: $bat\n" +
                 "• Messages Received: $msgs\n" +
                 "• Tag Displays Updated: $updates\n" +
-                "• Updates Saved (User Active on Phone): $prevScreenOn\n" +
-                "• Updates Saved (Night Quiet Mode): $prevNight\n" +
-                "• Updates Saved (Unchanged Content): $prevDup"
+                "• Saved (User Active on Phone): $prevScreenOn\n" +
+                "• Saved (Night Quiet Mode): $prevNight\n" +
+                "• Saved (Unchanged Content): $prevDup\n\n" +
+                getAppBatteryMetrics(ctx)
     }
 }

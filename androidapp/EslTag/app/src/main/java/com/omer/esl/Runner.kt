@@ -91,8 +91,11 @@ object Runner {
         if (!busy.compareAndSet(false, true)) { EslLog.add(ctx, "already running"); return false }
         try {
             EslLog.add(ctx, "rendering")
+            val t0 = System.currentTimeMillis()
             val payload = withContext(Dispatchers.IO) { render(ctx) }
-            EslLog.add(ctx, "payload ${payload.size} B")
+            val renderMs = System.currentTimeMillis() - t0
+            EslStats.addRenderTime(ctx, renderMs)
+            EslLog.add(ctx, "payload ${payload.size} B (${renderMs}ms)")
             showPreviewNotification(ctx)
             if (!upload) return true
             EslBle(ctx, MAC).upload(payload) { EslLog.add(ctx, it) }
