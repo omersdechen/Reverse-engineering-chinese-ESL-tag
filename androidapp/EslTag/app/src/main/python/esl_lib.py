@@ -16,13 +16,12 @@ FONTS = ["/system/fonts/NotoSansHebrew-Bold.ttf", "/system/fonts/NotoSansHebrew-
          "/system/fonts/DroidSans-Bold.ttf", "/system/fonts/DroidSans.ttf",
          "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"]
 _fcache = {}
-_emoji_font_64 = None
+_emoji_font_cache = {}
 
 
-def get_emoji_font_64():
-    global _emoji_font_64
-    if _emoji_font_64 is not None:
-        return _emoji_font_64
+def emoji_font(size):
+    if size in _emoji_font_cache:
+        return _emoji_font_cache[size]
     candidates = [
         "/system/fonts/NotoColorEmoji.ttf",
         "/system/fonts/NotoColorEmojiFlags.ttf",
@@ -31,12 +30,12 @@ def get_emoji_font_64():
     for p in candidates:
         if os.path.exists(p):
             try:
-                _emoji_font_64 = ImageFont.truetype(p, 64)
-                return _emoji_font_64
+                _emoji_font_cache[size] = ImageFont.truetype(p, size)
+                return _emoji_font_cache[size]
             except Exception:
                 continue
-    _emoji_font_64 = False
-    return False
+    _emoji_font_cache[size] = None
+    return None
 
 
 def is_emoji(c):
@@ -101,50 +100,43 @@ def new(bg="white"):
     return im, d
 
 
-def draw_emoji(im, xy, emoji_str, target_size, fill="black"):
-    """Renders color emoji at native 64px scale and resizes down to target_size."""
-    ef = get_emoji_font_64()
+def draw_emoji(im, xy, emoji_str, ef, fill="black"):
+    """Renders color emoji from NotoColorEmoji.ttf onto a temporary RGBA canvas and pastes onto RGB image im."""
     if not ef or not emoji_str or not im:
         return 0
     try:
-        dummy_im = Image.new("RGBA", (128, 128))
+        dummy_im = Image.new("RGBA", (1, 1))
         dummy_d = ImageDraw.Draw(dummy_im)
         bbox = dummy_d.textbbox((0, 0), emoji_str, font=ef)
         if not bbox:
             return 0
 
-        ew = max(1, bbox[2] - bbox[0] + 4)
-        eh = max(1, bbox[3] - bbox[1] + 4)
+        w = max(1, bbox[2] - bbox[0] + 6)
+        h = max(1, bbox[3] - bbox[1] + 6)
 
-        emoji_im = Image.new("RGBA", (ew, eh), (255, 255, 255, 0))
+        emoji_im = Image.new("RGBA", (w, h), (255, 255, 255, 0))
         emoji_d = ImageDraw.Draw(emoji_im)
-        emoji_d.text((-bbox[0] + 2, -bbox[1] + 2), emoji_str, font=ef, fill=(0, 0, 0, 255))
+        emoji_d.text((-bbox[0] + 3, -bbox[1] + 3), emoji_str, font=ef, fill=(0, 0, 0, 255))
 
-        bg = Image.new("RGB", (ew, eh), (255, 255, 255))
+        bg = Image.new("RGB", (w, h), (255, 255, 255))
         bg.paste(emoji_im, (0, 0), emoji_im)
 
-        aspect = ew / float(eh)
-        out_h = max(8, int(target_size))
-        out_w = max(8, int(out_h * aspect))
-
-        resized = bg.resize((out_w, out_h), Image.LANCZOS)
-
-        px = resized.load()
-        for py in range(out_h):
-            for px_x in range(out_w):
+        px = bg.load()
+        for py in range(h):
+            for px_x in range(w):
                 r, g, b = px[px_x, py]
-                if r < 130 and g < 130 and b < 130:
+                if r < 120 and g < 120 and b < 120:
                     px[px_x, py] = (0, 0, 0)
-                elif r > 150 and g < 110 and b < 110:
+                elif r > 150 and g < 100 and b < 100:
                     px[px_x, py] = (200, 0, 0)
-                elif r > 160 and g > 140 and b < 100:
+                elif r > 180 and g > 150 and b < 80:
                     px[px_x, py] = (230, 200, 0)
                 else:
                     px[px_x, py] = (255, 255, 255)
 
         x, y = int(xy[0]), int(xy[1])
-        im.paste(resized, (x, y))
-        return out_w
+        im.paste(bg, (x, y))
+        return w - 4
     except Exception:
         return 0
 
@@ -152,13 +144,20 @@ def draw_emoji(im, xy, emoji_str, target_size, fill="black"):
 def get_text_width(s, size):
     """Calculates true pixel width of text containing mixed normal text, Hebrew, and emojis."""
     f = font(size)
-    ef = get_emoji_font_64()
+    ef = emoji_font(size)
 
     total_w = 0
     tokens = re.findall(r'[\U00010000-\U0010ffff\u2600-\u27bf\u2300-\u23ff]+|[^\U00010000-\U0010ffff\u2600-\u27bf\u2300-\u23ff]+', s)
     for tok in tokens:
         if any(is_emoji(c) for c in tok) and ef:
-            total_w += size * len(tok)
+            try:
+                bbox = ef.getbbox(tok)
+                if bbox:
+                    total_w += (bbox[2] - bbox[0])
+                else:
+                    total_w += size
+            except Exception:
+                total_w += size
         else:
             try:
                 total_w += f.getlength(shape(tok))
@@ -171,7 +170,7 @@ def draw_text_smart(d, xy, s, size, fill="black", anchor="la"):
     """Smart text renderer with bi-directional Hebrew and Emoji support."""
     s = remove_unsupported_symbols(s)
     f = font(size)
-    ef = get_emoji_font_64()
+    ef = emoji_font(size)
 
     if not ef or not any(is_emoji(c) for c in s):
         d.text(xy, shape(s), font=f, fill=RGB[fill], anchor=anchor)
@@ -186,7 +185,7 @@ def draw_text_smart(d, xy, s, size, fill="black", anchor="la"):
 
     for tok in tokens:
         if any(is_emoji(c) for c in tok) and ef and im:
-            ew = draw_emoji(im, (curr_x, y), tok, size, fill=fill)
+            ew = draw_emoji(im, (curr_x, y - 2), tok, ef, fill=fill)
             curr_x += max(ew, size)
         else:
             d.text((curr_x, y), tok, font=f, fill=RGB[fill], anchor=anchor)
