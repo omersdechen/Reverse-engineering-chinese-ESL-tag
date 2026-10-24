@@ -11,6 +11,13 @@ class InboxListener : NotificationListenerService() {
     private val missedWords = listOf("missed voice call", "missed video call", "missed call",
         "שיחה שלא נענתה", "שיחת וידאו שלא נענתה")
 
+    private fun isSupportedPackage(pkg: String): Boolean {
+        return pkg.startsWith("com.whatsapp") ||
+            pkg == "com.samsung.android.app.reminder" ||
+            pkg == "com.samsung.android.reminder" ||
+            pkg.contains("reminder", ignoreCase = true)
+    }
+
     override fun onListenerConnected() {
         Inbox.init(this)
         for (s in activeNotifications ?: emptyArray()) handle(s)
@@ -30,10 +37,10 @@ class InboxListener : NotificationListenerService() {
     }
 
     private fun handleRemoved(s: StatusBarNotification, reason: Int) {
-        if (!s.packageName.startsWith("com.whatsapp")) return
+        if (!isSupportedPackage(s.packageName)) return
         
-        // If WhatsApp internally cancelled/replaced the notification (REASON_APP_CANCEL = 8),
-        // keep the chat in the inbox so it isn't deleted before upload!
+        // If app internally cancelled/replaced the notification (REASON_APP_CANCEL = 8),
+        // keep the item in the inbox so it isn't deleted before upload!
         if (reason == REASON_APP_CANCEL || reason == 12 /* REASON_GROUP_SUMMARY_CANCELED */) {
             return
         }
@@ -53,13 +60,17 @@ class InboxListener : NotificationListenerService() {
 
     @Suppress("DEPRECATION")
     private fun handle(s: StatusBarNotification): Kind? {
-        if (!s.packageName.startsWith("com.whatsapp")) return null
+        if (!isSupportedPackage(s.packageName)) return null
         val n = s.notification
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return null
-        val title = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+        val rawTitle = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
             ?: n.extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
             ?: s.notification.tickerText?.toString()
             ?: return null
+
+        val isReminder = s.packageName.contains("reminder", ignoreCase = true)
+        val title = if (isReminder) "Reminder: $rawTitle" else rawTitle
+
         val text = n.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
             ?: n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
             ?: ""
@@ -83,6 +94,7 @@ class InboxListener : NotificationListenerService() {
         if (!cfg.matches(this, title, text)) return null
         val count = (n.extras.getParcelableArray(Notification.EXTRA_MESSAGES)?.size ?: 1).coerceAtLeast(1)
         Inbox.setChat(s.key, Chat(title, count, if (cfg.showText) text else "", s.postTime))
+        EslStats.incMessages(this)
         return Kind.CHAT
     }
 }

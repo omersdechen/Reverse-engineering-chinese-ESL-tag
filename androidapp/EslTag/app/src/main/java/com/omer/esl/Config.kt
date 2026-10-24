@@ -11,13 +11,28 @@ data class Config(
     val showText: Boolean,
     val chatDelayS: Int,
     val chatMinGapS: Int,
+    val weatherReturnS: Int,
+    val chatTimeoutM: Int,
     val showCalls: Boolean,
     val showMessages: Boolean,
     val showMissed: Boolean,
     val showFavorites: Boolean,
     val compactWeather: Boolean,
-    val nameMaxLen: Int
+    val nameMaxLen: Int,
+    val nightQuietMode: Boolean,
+    val nightStartHour: Int,
+    val nightEndHour: Int
 ) {
+
+    fun isNightHours(): Boolean {
+        if (!nightQuietMode) return false
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        return if (nightStartHour > nightEndHour) {
+            hour >= nightStartHour || hour < nightEndHour
+        } else {
+            hour in nightStartHour until nightEndHour
+        }
+    }
 
     companion object {
         fun clean(s: String): String {
@@ -54,15 +69,20 @@ data class Config(
                 people = if (a == null) emptyList() else (0 until a.length()).map { clean(a.getString(it)) },
                 showText = j.optBoolean("show_text", true),
                 chatDelayS = j.optInt("chat_delay_s", 2),
-                chatMinGapS = j.optInt("chat_min_gap_s", 5),
+                chatMinGapS = j.optInt("chat_min_gap_s", 10),
+                weatherReturnS = j.optInt("weather_return_s", 60),
+                chatTimeoutM = j.optInt("chat_timeout_m", 30),
                 showCalls = j.optBoolean("show_calls", true),
                 showMessages = j.optBoolean("show_messages", true),
                 showMissed = j.optBoolean("show_missed", true),
                 showFavorites = j.optBoolean("show_favorites", true),
                 compactWeather = j.optBoolean("compact_weather", true),
-                nameMaxLen = j.optInt("name_max_len", 8)
+                nameMaxLen = j.optInt("name_max_len", 8),
+                nightQuietMode = j.optBoolean("night_quiet_mode", true),
+                nightStartHour = j.optInt("night_start_hour", 23),
+                nightEndHour = j.optInt("night_end_hour", 7)
             )
-        } catch (e: Exception) { Config(emptyList(), true, 2, 5, true, true, true, true, true, 8) }
+        } catch (e: Exception) { Config(emptyList(), true, 2, 10, 60, 30, true, true, true, true, true, 8, true, 23, 7) }
     }
 
     /** 1:1 chat: title is the contact. Group: title is the group, text starts with "Sender:". */

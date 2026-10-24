@@ -208,13 +208,13 @@ def render():
     i0 = next((i for i, x in enumerate(h["time"]) if x[:13] == now), 0)
     hrs = [(int(h["time"][i][11:13]), h["precipitation_probability"][i] or 0, h["precipitation"][i] or 0)
            for i in range(i0, min(i0 + RAIN_HOURS, len(h["time"])))]
-    base, hmax, step = 110, 16, 19.5
+    base, hmax, step = 105, 14, 19.5
     d.line([(4, base + 1), (SW - 5, base + 1)], fill=K)
     for n, (hh, p, mm) in enumerate(hrs):
         x = int(8 + n * step)
         d.rectangle([x, base - max(1, round(p / 100 * hmax)) + 1, x + 14, base], fill=R if mm >= 0.1 else K)
         if n % 3 == 0:
-            d.text((x + 7, 117), "%02d" % hh, font=E.font(9), fill=K, anchor="mm")
+            d.text((x + 7, 107), "%02d" % hh, font=E.font(8), fill=K, anchor="mt")
     return E.to_payload(im)
 
 
@@ -282,8 +282,8 @@ def draw_compact(d, x0, y0, w, h, j=None):
     hrs = [(int(h_data["time"][i][11:13]), h_data["precipitation_probability"][i] or 0, h_data["precipitation"][i] or 0)
            for i in range(i0, min(i0 + 6, len(h_data["time"])))]
 
-    base_y = y0 + 111
-    bar_hmax = 12
+    base_y = y0 + 106
+    bar_hmax = 11
     step = (w - 8) / max(1, len(hrs))
     for n, (hh, p, mm) in enumerate(hrs):
         bx = int(x0 + 4 + n * step)
@@ -291,4 +291,4 @@ def draw_compact(d, x0, y0, w, h, j=None):
         bh = max(1, round(p / 100.0 * bar_hmax))
         d.rectangle([bx, base_y - bh, bx + bw, base_y], fill=R if mm >= 0.1 else K)
         if n % 2 == 0:
-            d.text((bx + bw // 2, y0 + 116), "%02d" % hh, font=E.font(7), fill=K, anchor="mm")
+            d.text((bx + bw // 2, y0 + 108), "%02d" % hh, font=E.font(7), fill=K, anchor="mt")

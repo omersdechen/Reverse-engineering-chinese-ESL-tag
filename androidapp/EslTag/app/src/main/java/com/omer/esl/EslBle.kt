@@ -140,7 +140,11 @@ class EslBle(private val ctx: Context, private val mac: String) {
             log(if (acked) "ACK received" else "no ACK (assuming ok)")
             delay(1500)
         } finally {
-            g.disconnect(); g.close()
+            try {
+                g.disconnect()
+                delay(200)
+                g.close()
+            } catch (_: Exception) {}
         }
     }
 }

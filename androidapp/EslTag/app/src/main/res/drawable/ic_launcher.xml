@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Background Circle/Card -->
+    <path
+        android:fillColor="#1A1C1E"
+        android:pathData="M54,6 C27.5,6 6,27.5 6,54 C6,80.5 27.5,102 54,102 C80.5,102 102,80.5 102,54 C102,27.5 80.5,6 54,6 Z" />
+
+    <!-- E-Paper Display Frame -->
+    <path
+        android:fillColor="#C00D0D"
+        android:pathData="M24,30 L84,30 C87.3,30 90,32.7 90,36 L90,72 C90,75.3 87.3,78 84,78 L24,78 C20.7,78 18,75.3 18,72 L18,36 C18,32.7 20.7,30 24,30 Z" />
+
+    <!-- Inner White E-Ink Screen -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M22,34 L86,34 L86,74 L22,74 Z" />
+
+    <!-- Header Bar on Tag -->
+    <path
+        android:fillColor="#C00D0D"
+        android:pathData="M22,34 L86,34 L86,44 L22,44 Z" />
+
+    <!-- Weather & Message Symbols on Tag Screen -->
+    <path
+        android:fillColor="#E6C800"
+        android:pathData="M34,56 C34,52.7 36.7,50 40,50 C43.3,50 46,52.7 46,56 C46,59.3 43.3,62 40,62 C36.7,62 34,59.3 34,56 Z" />
+
+    <!-- Message Lines -->
+    <path
+        android:fillColor="#1A1C1E"
+        android:pathData="M52,50 L78,50 L78,53 L52,53 Z M52,56 L74,56 L74,59 L52,59 Z M52,62 L68,62 L68,65 L52,65 Z" />
+
+    <!-- Wireless Signal Waves -->
+    <path
+        android:fillColor="#E6C800"
+        android:pathData="M54,20 C42,20 31.5,24.5 24,32 L27.5,35.5 C34.2,28.8 43.6,24.8 54,24.8 C64.4,24.8 73.8,28.8 80.5,35.5 L84,32 C76.5,24.5 66,20 54,20 Z" />
+</vector>

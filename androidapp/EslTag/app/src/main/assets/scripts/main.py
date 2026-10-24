@@ -76,11 +76,31 @@ def inbox_screen(d, x0, y0, w, h, chats, missed, show_text, name_max_len=8):
     d.rectangle([x0, y0, x0 + w - 1, y0 + 15], fill=R)
     E.text(d, (x0 + 4, y0 + 8), "Messages", size=10, fill="white", anchor="lm")
     E.text(d, (x0 + w - 4, y0 + 8), time.strftime("%H:%M"), size=9, fill="white", anchor="rm")
+
     band = 22 if missed else 0
-    top, bottom = y0 + 18, y0 + h - band - 2
-    rowh = 36 if show_text else 18
-    n = max(1, (bottom - top) // rowh)
-    rows = chats if len(chats) <= n else chats[:n - 1]
+    top = y0 + 18
+    bottom = y0 + h - band - 2
+    avail_h = max(20, bottom - top)
+
+    if not chats and not missed:
+        E.text(d, (x0 + w // 2, (top + bottom) // 2), "No Messages", size=10, fill="black", anchor="mm")
+        return
+
+    num_chats = len(chats)
+    if num_chats == 0:
+        rows = []
+        row_h = avail_h
+    elif num_chats == 1:
+        rows = chats
+        row_h = avail_h
+    elif num_chats == 2:
+        rows = chats
+        row_h = avail_h // 2
+    else:
+        max_rows = max(1, avail_h // 28)
+        rows = chats[:max_rows]
+        row_h = avail_h // len(rows)
+
     y = top
     for c in rows:
         formatted_who = format_name(c["who"], name_max_len)
@@ -89,17 +109,20 @@ def inbox_screen(d, x0, y0, w, h, chats, missed, show_text, name_max_len=8):
         d.rectangle([x0 + w - 24, y + 1, x0 + w - 4, y + 13], fill=R)
         E.text(d, (x0 + w - 14, y + 7), str(c["count"]), size=8.5, fill="white", anchor="mm")
 
-        # More message content (up to 2 lines per row)
+        # Fluid multi-line message content expansion up to all available space
         if show_text and c.get("last"):
-            lines = wrap_text(d, c["last"], 8.5, w - 8, max_lines=2)
-            if len(lines) >= 1:
-                E.text(d, (x0 + 4, y + 14), lines[0], size=8.5, fill="black", anchor="lm")
-            if len(lines) >= 2:
-                E.text(d, (x0 + 4, y + 24), lines[1], size=8.5, fill="black", anchor="lm")
-        y += rowh
+            max_lines = max(1, (row_h - 14) // 10)
+            lines = wrap_text(d, c["last"], 8.5, w - 8, max_lines=max_lines)
+            line_y = y + 14
+            for line in lines:
+                E.text(d, (x0 + 4, line_y), line, size=8.5, fill="black", anchor="lm")
+                line_y += 10
+
+        y += row_h
 
     if len(chats) > len(rows):
-        E.text(d, (x0 + 4, y + 6), "+%d more" % (len(chats) - len(rows)), size=8.5, fill="red", anchor="lm")
+        E.text(d, (x0 + 4, y - 10), "+%d more" % (len(chats) - len(rows)), size=8.5, fill="red", anchor="lm")
+
     if missed:
         d.rectangle([x0, y0 + h - band, x0 + w - 1, y0 + h - 1], fill=Y)
         s = "Missed: " + ", ".join("%s %s" % (format_name(m["who"], name_max_len), hhmm(m["ts"])) for m in missed[:2])
@@ -117,7 +140,12 @@ def render():
     name_max_len = cfg.get("name_max_len", 8)
 
     ringing = ib.get("ringing") if show_calls else None
-    chats = ib.get("chats", []) if show_messages else []
+
+    # Expire old chats after chat_timeout_m minutes
+    chat_limit = time.time() * 1000 - cfg.get("chat_timeout_m", 30) * 60 * 1000
+    raw_chats = ib.get("chats", []) if show_messages else []
+    chats = [c for c in raw_chats if c.get("ts", 0) >= chat_limit]
+
     missed = [m for m in ib.get("missed", []) if m["ts"] >= limit] if show_missed else []
 
     # Deduplicate chats by contact name

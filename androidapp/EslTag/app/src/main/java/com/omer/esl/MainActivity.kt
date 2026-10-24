@@ -82,7 +82,9 @@ class MainActivity : Activity() {
         val listener = NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
         info.text = "Tag ${Runner.MAC}\npaired: ${associated()}   last daily upload: ${Runner.lastOk(this)}\n" +
             "WhatsApp access: $listener   call log: ${granted(Manifest.permission.READ_CALL_LOG)}   " +
-            "contacts: ${granted(Manifest.permission.READ_CONTACTS)}\nscripts: ${Runner.scriptsDir(this)}"
+            "contacts: ${granted(Manifest.permission.READ_CONTACTS)}\n" +
+            EslStats.getSummary(this) + "\n" +
+            "scripts: ${Runner.scriptsDir(this)}"
         File(Runner.scriptsDir(this), "preview.png").takeIf { it.exists() }
             ?.let { preview.setImageBitmap(BitmapFactory.decodeFile(it.path)) }
         logView.text = EslLog.read(this)
