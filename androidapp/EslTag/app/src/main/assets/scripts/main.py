@@ -44,7 +44,7 @@ def wrap_text(d, text, font_size, max_w, max_lines=2):
     curr = ""
     for w in words:
         test = (curr + " " + w).strip() if curr else w
-        if d.textlength(E.shape(test), font=E.font(font_size)) <= max_w:
+        if E.get_text_width(test, font_size) <= max_w:
             curr = test
         else:
             if curr:
@@ -55,7 +55,7 @@ def wrap_text(d, text, font_size, max_w, max_lines=2):
     if curr and len(lines) < max_lines:
         lines.append(curr)
 
-    if lines and d.textlength(E.shape(lines[-1]), font=E.font(font_size)) > max_w:
+    if lines and E.get_text_width(lines[-1], font_size) > max_w:
         lines[-1] = trunc(d, lines[-1], font_size, max_w)
     return lines
 
